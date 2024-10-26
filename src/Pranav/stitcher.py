@@ -11,7 +11,7 @@ class PanaromaStitcher():
     def __init__(self):
         pass
 
-    def make_panaroma_for_images_in(self,path,th=0.5,limit=1000,careful=False,t=1):
+    def make_panaroma_for_images_in(self,path,th=0.5,limit=2000,careful=False,t=1):
         imf = path
         all_images = sorted(glob.glob(imf+os.sep+'*'))
         n = len(all_images)
@@ -30,11 +30,11 @@ class PanaromaStitcher():
         origin1 = array([0,0,0])
         for i in range(n//2 - 1):
             print("Calculating Homography")
-            H = Pan.Homo(grays[i],grays[i+1],
+            H = self.Homo(grays[i],grays[i+1],
             trials=10000,t=t,T=None,s=10,initial_s=1000,th=th,limit=limit)
             homography_matrix_list.append(H)
             print("Stitching")
-            leftIm,origin1 = Pan.stitch_pair(leftIm,grays[i+1],H,origin1,epsilon=0,th=th,Xlim=limit)
+            leftIm,origin1 = self.stitch_pair(leftIm,grays[i+1],H,origin1,epsilon=0,th=th,Xlim=limit)
         #plt.figure()
         #plt.imshow(leftIm)
         #plt.plot([origin1[1]],[origin1[0]],'ro')
@@ -44,28 +44,28 @@ class PanaromaStitcher():
         origin2= array([0,0,0])
         for i in range(n-1,n//2,-1):
             print("Calculating Homography")
-            H = Pan.Homo(grays[i],grays[i-1],
+            H = self.Homo(grays[i],grays[i-1],
             trials=10000,t=t,T=None,s=10,initial_s=1000,th=th,limit=limit)
             homography_matrix_list.append(H)
             print("Stitching")
-            rightIm,origin2 = Pan.stitch_pair(rightIm,grays[i-1],H,origin2,epsilon=0,th=th,Xlim=limit)
+            rightIm,origin2 = self.stitch_pair(rightIm,grays[i-1],H,origin2,epsilon=0,th=th,Xlim=limit)
             col = rightIm.shape[1]
             rightIm = rightIm[:,:limit]
         print("Homography between centermost images")
-        H = Pan.Homo(grays[n//2-1],grays[n//2],
+        H = self.Homo(grays[n//2-1],grays[n//2],
         trials=10000,t=t,T=None,s=4,initial_s=1000,th=th,limit=limit)#,visualise=True)
-        behind,origin = Pan.stitch_pair(
+        behind,origin = self.stitch_pair(
             grays[n//2 -1],grays[n//2],H,
             epsilon=0,th=th,
             Xlim=limit,Ylim=limit)
         homography_matrix_list.append(H)
         print("Stitching Left and Right")
-        im,origin = Pan.stitch_pair(
+        im,origin = self.stitch_pair(
             leftIm,rightIm,H,
             origin1,origin2=origin2,
             epsilon=0,th=th,
             Xlim=2*limit,Ylim=limit)
-        print("Done with",path)
+        print("Done with",path,'\n')
         return im, homography_matrix_list
 
     def Homo(self,img1,img2,th=0.5,th2=None,visualise=False,I1=None,I2=None,trials=1000,t=None,T=None,s=8,initial_s=100,limit=1000,return_t=False):
@@ -150,30 +150,14 @@ class PanaromaStitcher():
             # I know, we should use_/5.99 sigma .. but we don't have any prior information of the system
             inliers = d < t
             inliers = [i for i in range(len(inliers)) if inliers[i]]
-            #T = len(inliers)
             print("found params")
-            # this also gives us w .. but without p, we can't use it to find N
-            #indi = [ind]
-            #cardSi = [len(inliers)]
-        #else:
-        #    indi=[]
-        #    cardSi=[]
         indi = []
         cardSi = []
-        #Split the image into boxes
         print("Running RanSac on S with |S|=",S.shape[0])
         for i in range(trials):
-            #print(f"{i}th trial")
             ind = random.randint(0,len(S),s)
             Sit = S[ind]
             Hi =self.findH(Sit)
-            #corners=array([[0,0,1],[0,M,1],[N,0,1],[N,M,1]])
-            #corners = corners @ Hi.T
-            #corners = corners/(corners[:,2][:,newaxis])
-            #worst = amax(abs(corners))
-            #print(worst)
-            #if worst > limit:continue
-            #print(X.shape,Hi.shape)
             Ypred = X @ Hi.T
             Ypred = Ypred /Ypred[:,2][:,newaxis]
             d = (Ypred - Y)**2
@@ -212,7 +196,6 @@ class PanaromaStitcher():
         """
         H : img1 - origin -> img2 - origin2
         """
-        print(img1.shape,img2.shape)
         if H is None:
             H = self.Homo(img1,img2,th=th,t=t,T=T,s=s,initial_s=initial_s)
             origin = array([0,0,0])
@@ -239,13 +222,8 @@ class PanaromaStitcher():
         up = min(up,0)
         right = max(right,img2.shape[1]-1)
         down = max(down,img2.shape[0]-1)
-        #print(left,up,right,down)
         assert left <= 0,left
         assert up <= 0, up
-        #print(img2.shape[0],-left)
-        #print(-up,img2.shape[1])
-        #print(img2.shape[0],right-img2.shape[1]+1)
-        #print(down-img2.shape[0]+1,img2.shape[1])
         o = array([0,0,0])
         rightextra = right-img2.shape[1]+1
         if careful:
@@ -267,9 +245,11 @@ class PanaromaStitcher():
         elif right > Xlim and left >= 0:
             print("Killing some right columns")
             o[1] =0
+            pad =min(right-img2.shape[1]+1,
+            max(Xlim-img2.shape[1],0))
             img2 = concatenate((
                 img2,
-                zeros((img2.shape[0],min(right-img2.shape[1]+1,Xlim-img2.shape[1])),dtype=int8)
+                zeros((img2.shape[0],pad),dtype=int8)
                 ),axis=1)
         elif right - left > Xlim and left<0 and right > img2.shape[1]:# kill columns from both sides
             print("killing from both sides")
@@ -289,7 +269,6 @@ class PanaromaStitcher():
                 zeros((img2.shape[0],right-img2.shape[1]+1),dtype=int8)
                 ),axis=1)
         print("first concatenation done")
-        #print("o is",o)
         downextra = down-img2.shape[0]+1
         if careful:
             o[0] = -up
@@ -317,7 +296,6 @@ class PanaromaStitcher():
                 ),axis=0)
         print("second concatenation done")
         n,m = img2.shape
-
         for i,x in enumerate(Ypred):
             if x[0]+o[0] >= n or x[0]+o[0]<0:continue
             if x[1]+o[1] >= m or x[1]+o[1]<0:continue
@@ -328,7 +306,7 @@ class PanaromaStitcher():
 
 if __name__=="__main__":
     Pan = PanaromaStitcher()
-    imf = path = "ES666-Assignment3/Images/I3_down"
-    im,Hom = Pan.make_panaroma_for_images_in(path,th=0.5,limit=1000,careful=False,t=1)
+    path = "Images/I1_down"
+    im,Hom = Pan.make_panaroma_for_images_in(path)
     plt.imshow(im)
     plt.show()

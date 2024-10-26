@@ -8,10 +8,12 @@ import cv2
 
 
 ### Change path to images here
-path = 'Images{}*'.format(os.sep)  # Use os.sep, Windows, linux have different path delimiters
+path = 'Images{}*_down'.format(os.sep)  # Use os.sep, Windows, linux have different path delimiters
 ###
 
-all_submissions = glob.glob('./src/*')
+all_submissions = glob.glob('./src/*Pranav')
+print(len(all_submissions))
+print(all_submissions)
 os.makedirs('./results/', exist_ok=True)
 for idx,algo in enumerate(all_submissions):
     print('****************\tRunning Awesome Stitcher developed by: {}  | {} of {}\t********************'.format(algo.split(os.sep)[-1],idx,len(all_submissions)))
@@ -38,4 +40,5 @@ for idx,algo in enumerate(all_submissions):
 
     except Exception as e:
         print('Oh No! My implementation encountered this issue\n\t{}'.format(e))
+        print(e)
         print('\n\n')
